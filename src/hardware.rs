@@ -388,7 +388,7 @@ impl HeadsetInfo {
     #[instrument(level = "debug", skip_all)]
     pub fn get_handle(api: &mut HidApi) -> Result<HidDevice, HeadsetError> {
         match api.refresh_devices() {
-            Ok(_) => trace!("refreshed devices"),
+            Ok(_) => trace!("refreshed usb devices"),
             Err(error) => return Err(HeadsetError::HidApiError { msg: error.to_string() })
         }
 
@@ -410,7 +410,7 @@ impl HeadsetInfo {
         }
     }
     
-    #[instrument(level = "trace", skip_all)]
+    #[instrument(level = "debug", skip_all)]
     pub fn about_device(&self) -> Result<(), HeadsetError> {
         debug!("grabbing device information");
 

@@ -62,7 +62,7 @@ fn logger_setup() {
         Ok(_) => if let Some(level) = level_hint {
             println!("logging enabled");
             println!("disabled scopes: smithay_clipboard, calloop_wayland_source, calloop, winit");
-            println!("current verbosity level: {}", level.to_string().to_uppercase());
+            println!("current verbosity level: {}", level);
             if cfg!(unix) { warn!("unix system detected, device information may be inaccurate") }
         },
         Err(error) => eprintln!("failed to initialize logging: {}", error)
@@ -86,7 +86,7 @@ fn main() {
         }
 
         'keep_alive: loop {
-            debug!("trying to initialize headset...");
+            trace!("trying to initialize headset...");
 
             let mut device = match init_device() {
                 Ok(device) => {
@@ -100,7 +100,9 @@ fn main() {
                         10..=20 => 10,
                         _ => 60
                     };
-                    error!("device initialization failed: {} attempt: #{}, delay until next attempt: {} sec(s)", error, retry_count, retry_sec);
+                    error!("device initialization failed!");
+                    error!("reason: {}, attempt: #{}", error, retry_count);
+                    trace!("delay until next attempt: {} sec(s)", retry_sec);
                     sleep_sec(retry_sec);
                     retry_count = retry_count.saturating_add(1);
 

@@ -432,7 +432,7 @@ impl HeadsetInfo {
     }
 
     pub fn send_info_to_gui(&mut self, sender: Sender<ThreadMessage>) -> Result<(), HeadsetError> {
-        self.simulate_connect();
+        // self.simulate_connect();
         
         send_to_gui!(self, battery_level, sender);
         send_to_gui!(self, charging_status, sender);

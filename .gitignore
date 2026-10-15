@@ -1,3 +1,4 @@
 target/
 prev.rs
 Cargo.lock
+.DS_STORE

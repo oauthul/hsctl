@@ -56,7 +56,7 @@ pub fn main(gui_tx: Sender<ThreadMessage>, gui_rx: Receiver<ThreadMessage>) -> e
     };
 
     eframe::run_native(
-        "hyperx-monitor",
+        "hsctl",
         options,
         Box::new(|cc| {
             Ok(Box::new(HeadsetGuiValues::new(cc, gui_tx, gui_rx)))

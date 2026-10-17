@@ -3,7 +3,8 @@ mod ui;
 
 use hidapi::{HidApi, HidError, HidDevice};
 use crossbeam_channel::unbounded;
-use tracing::{info, debug, error, warn, trace, Level, subscriber};
+use eframe::egui::Context;
+use tracing::{info, debug, error, warn, trace, Level, subscriber, instrument};
 use tracing_subscriber::{FmtSubscriber, EnvFilter, fmt, prelude::*, registry::Registry, filter::{Targets, LevelFilter, Directive}};
 use hardware::{Response, HeadsetInfo, Commands, HeadsetError};
 use clap::Parser;
@@ -25,9 +26,11 @@ enum ThreadMessage {
     HeadsetResponse(hardware::Response),
     Request(hardware::Commands),
     Ready,
-    Set { command: hardware::Commands, param: Option<u8> }
+    Set { command: hardware::Commands, param: Option<u8> },
+    Context(eframe::egui::Context)
 }
 
+#[instrument(level = "debug", skip_all)]
 fn init_device() -> Result<HeadsetInfo, HeadsetError> {
     let mut device = HeadsetInfo::new()?;
 
@@ -38,6 +41,7 @@ fn init_device() -> Result<HeadsetInfo, HeadsetError> {
     Ok(device)
 }
 
+#[instrument(level = "debug", skip_all)]
 fn logger_setup() {
     let formatter = fmt::layer()
                     .with_thread_names(true)
@@ -69,6 +73,7 @@ fn logger_setup() {
     }
 }
 
+#[instrument(level = "debug", skip_all)]
 fn main() {
     logger_setup();
     let (hardware_tx, gui_rx) = unbounded::<ThreadMessage>();

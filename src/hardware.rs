@@ -1,4 +1,5 @@
 use std::fmt;
+use eframe::egui::Context;
 use tracing::{info, debug, warn, error, trace, instrument};
 use hidapi::{HidApi, HidDevice, HidError, DeviceInfo};
 use std::collections::HashMap;
@@ -68,6 +69,7 @@ pub enum Commands {
 
 impl TryFrom<u8> for Commands {
     type Error = String;
+    #[instrument(level = "debug", skip_all)]
     fn try_from(command: u8) -> Result<Self, Self::Error> {
         match command {
             1 => Ok(Self::GetHeadsetStatus),
@@ -186,7 +188,8 @@ pub enum HeadsetError {
     HidApiError { msg: String },
     EmptyHandle,
     FlushError,
-    ParseError { msg: String }
+    ParseError { msg: String },
+    GetContextError
 }
 
 impl fmt::Display for HeadsetError {
@@ -199,7 +202,8 @@ impl fmt::Display for HeadsetError {
             Self::HidApiError { msg } => write!(formatting, "hidapi error occurred, msg: {}", msg),
             Self::EmptyHandle => write!(formatting, "no matching usb device found!"),
             Self::FlushError => write!(formatting, "failed to flush queue!"),
-            Self::ParseError { msg } => write!(formatting, "failed to parse buffer! msg: {}", msg)
+            Self::ParseError { msg } => write!(formatting, "failed to parse buffer! msg: {}", msg),
+            Self::GetContextError => write!(formatting, "failed to get context handle from gui!")
         }
     }
 }
@@ -431,6 +435,7 @@ impl HeadsetInfo {
         }
     }
 
+    #[instrument(level = "debug", skip_all)]
     pub fn send_info_to_gui(&mut self, sender: Sender<ThreadMessage>) -> Result<(), HeadsetError> {
         // self.simulate_connect();
         
@@ -445,9 +450,31 @@ impl HeadsetInfo {
         Ok(())
     }
 
+    #[instrument(level = "debug", skip_all)]
+    pub fn get_context_handle(&mut self, hardware_rx: Receiver<ThreadMessage>) -> Result<Context, HeadsetError> {
+        loop {
+            match hardware_rx.recv() {
+                Ok(resp) => {
+                    trace!("waiting until gui context handle is received..");
+                    match resp {
+                        ThreadMessage::Context(ctx) => {
+                            debug!("got gui context handle");
+                            return Ok(ctx)
+                        },
+                        _ => ()
+                    }
+                },
+
+                Err(_) => return Err(HeadsetError::GetContextError)
+            }
+        }
+    }
+
+    #[instrument(level = "debug", skip_all)]
     pub fn listen_for_updates(&mut self, hardware_tx: Sender<ThreadMessage>, hardware_rx: Receiver<ThreadMessage>) -> Result<(), HeadsetError> {
         info!("successfully started background listening");
         let mut buf = [0u8; 20];
+        let mut context: Context = self.get_context_handle(hardware_rx.clone())?;
 
         loop {
             // test receiving data across threads
@@ -498,6 +525,7 @@ impl HeadsetInfo {
                         }
                     }
 
+                    context.request_repaint();
                     buf = [0u8; 20];
                 },
                 Err(error) => {
@@ -593,20 +621,6 @@ impl HeadsetInfo {
     pub fn set_sidetone_volume(&mut self, volume: Option<u8>) -> Result<(), HeadsetError> {
         debug!("querying device");
         execute!(self, sidetone_volume, Commands::SetSidetoneVolume, volume);
-
-        Ok(())
-    }
-
-    #[instrument(level = "debug", skip_all)]
-    pub fn simulate_connect(&mut self) -> Result<(), HeadsetError> {
-        self.battery_level = Some(Response::BatteryLevel(50));
-        self.charging_status = Some(Response::ChargingStatus(true));
-        self.headset_status = Some(Response::IsActive(true));
-        self.microphone_status = Some(Response::MicrophoneStatus(true));
-        self.shutdown_time = Some(Response::AutoShutdownTime(40));
-        self.sidetone_status = Some(Response::SidetoneStatus(true));
-        self.sidetone_volume = Some(Response::SidetoneVolume(20));
-        self.noisegate_status = Some(Response::NoiseGateStatus(false));
 
         Ok(())
     }

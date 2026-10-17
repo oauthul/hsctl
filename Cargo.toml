@@ -10,3 +10,4 @@ hidapi = "2.6.4"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"]}
 clap = { version = "4.6.5", features = ["derive"] }
+winit = "0.30.13"

@@ -1,8 +1,9 @@
 use std::fmt;
 use eframe::{egui, egui::viewport::IconData};
-use tracing::{warn, info, trace, debug};
+use tracing::{warn, info, trace, debug, instrument};
 use crate::{ThreadMessage, Response, sleep_sec, Commands};
 use crossbeam_channel::{unbounded, Sender, Receiver};
+use winit;
 
 fn new_rich_text(string: &str, size: f32) -> egui::RichText {
     egui::RichText::new(string).size(size)
@@ -110,7 +111,17 @@ pub fn main(gui_tx: Sender<ThreadMessage>, gui_rx: Receiver<ThreadMessage>) -> e
 }
 
 impl Gui {
+    #[instrument(level = "debug", skip_all)]
     fn new(cc: &eframe::CreationContext<'_>, gui_tx: Sender<ThreadMessage>, gui_rx: Receiver<ThreadMessage>) -> Self {
+        let mut context: eframe::egui::Context;
+        context = cc.egui_ctx.clone();
+        
+        gui_tx.clone().send(ThreadMessage::Context(context)).unwrap();
+        trace!("sent context handle to worker thread");
+
+        gui_tx.clone().send(ThreadMessage::Ready).unwrap();
+        trace!("sent ready state to worker thread");
+
         Self {
             channels: ThreadChannel {
                 sender: Some(gui_tx),
@@ -123,19 +134,11 @@ impl Gui {
 }
 
 impl eframe::App for Gui {
+    #[instrument(level = "debug", skip_all)]
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ui, |ui| {
             if !self.state.is_synced {
                 ui.heading(new_rich_text("device is not synchronized.", 24.0));
-
-                if ui.add(egui::Button::new("Refresh")).clicked() {
-                    trace!("refresh button clicked!");
-                    self.channels.sender
-                        .clone()
-                        .expect("failed to find sender variable for refresh!")
-                        .send(ThreadMessage::Ready).unwrap();
-                    trace!("sent gui ready command, awaiting device information");
-                }
             } else {
                 ui.heading(new_rich_text("device is synchronized!", 24.0));
             }
@@ -158,6 +161,7 @@ impl eframe::App for Gui {
         });
     }
 
+    #[instrument(level = "debug", skip_all)]
     fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         match self.channels.receiver
                 .clone()
@@ -179,7 +183,8 @@ impl eframe::App for Gui {
                 ThreadMessage::Ready => {
                     info!("successfully synchronized gui and worker thread!");
                     self.state.is_synced = true;
-                }
+                },
+                _ => ()
             }
             Err(_) => ()
         }

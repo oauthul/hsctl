@@ -1,17 +1,15 @@
 mod hardware;
 mod ui;
 
-use hidapi::{HidApi, HidError, HidDevice};
-use crossbeam_channel::unbounded;
+use crossbeam_channel::{unbounded};
 use eframe::egui::Context;
 use tracing::{info, debug, error, warn, trace, Level, subscriber, instrument};
-use tracing_subscriber::{FmtSubscriber, EnvFilter, fmt, prelude::*, registry::Registry, filter::{Targets, LevelFilter, Directive}};
-use hardware::{Response, HeadsetInfo, Commands, HeadsetError};
-use clap::Parser;
+use tracing_subscriber::{EnvFilter, fmt, prelude::*, registry::Registry};
+use hardware::{HeadsetInfo, HeadsetError};
+use ui::GuiDeviceInfo;
 use std::thread::{sleep, spawn};
 use std::time::Duration;
 use std::sync::{Arc, Mutex};
-use std::env;
 
 pub fn sleep_ms(ms: u64) {
     sleep(Duration::from_millis(ms))
@@ -27,13 +25,15 @@ enum ThreadMessage {
     Request(hardware::Commands),
     Ready,
     Set { command: hardware::Commands, param: Option<u8> },
-    Context(eframe::egui::Context)
+    Context(Context),
+    GuiDeviceStruct(Arc<Mutex<GuiDeviceInfo>>)
 }
 
 #[instrument(level = "debug", skip_all)]
 fn init_device() -> Result<HeadsetInfo, HeadsetError> {
     let mut device = HeadsetInfo::new()?;
 
+    device.about_device()?;
     device.query_device()?;
     debug!("successfully queried device");
 
@@ -83,13 +83,6 @@ fn main() {
         let mut retry_count: u8 = 0;
         let mut retry_sec: u64;
 
-        // Attempt to print device information
-        if let Ok(temp) = HeadsetInfo::new() {
-            let _ = temp.about_device();
-        } else {
-            warn!("failed to print device information!")
-        }
-
         'keep_alive: loop {
             trace!("trying to initialize headset...");
 
@@ -124,5 +117,5 @@ fn main() {
         }
     });
 
-    ui::main(gui_tx, gui_rx);
+    let _ = ui::main(gui_tx, gui_rx);
 }

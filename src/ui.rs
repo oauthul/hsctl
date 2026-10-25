@@ -1,40 +1,52 @@
 use std::fmt;
-use eframe::{egui, egui::viewport::IconData};
-use tracing::{warn, info, trace, debug, instrument};
-use crate::{ThreadMessage, Response, sleep_sec, Commands};
-use crossbeam_channel::{unbounded, Sender, Receiver};
-use winit;
+use eframe::{egui, UserEvent, egui::Context};
+use tracing::{warn, trace, instrument};
+use crate::{ThreadMessage, hardware::Response, Arc, Mutex};
+use crossbeam_channel::{Sender, Receiver};
+use winit::event_loop::{ControlFlow, EventLoop};
 
 fn new_rich_text(string: &str, size: f32) -> egui::RichText {
     egui::RichText::new(string).size(size)
 }
 
-pub enum GuiResponse {
-    Unset,
-    BatteryLevel(u8),
-    ChargingStatus(bool),
-    IsActive(bool),
-    AutoShutdownTime(u8),
-    SidetoneStatus(bool),
-    SidetoneVolume(u8),
-    NoiseGateStatus(bool),
-    MicrophoneStatus(bool)
+fn send_context(context: Context, sender: Sender<ThreadMessage>) -> Result<(), ()> {
+    sender.clone().send(ThreadMessage::Context(context)).unwrap();
+
+    Ok(())
 }
 
-impl fmt::Display for GuiResponse {
-    fn fmt(&self, formatting: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::Unset => write!(formatting, "n/a"),
-            Self::IsActive(activity) => write!(formatting, "{}", if *activity { "active" } else { "inactive" }),
-            Self::BatteryLevel(level) => write!(formatting, "{}%", level),
-            Self::ChargingStatus(status) => write!(formatting, "{}", if *status { "charging" } else { "not charging" }),
-            Self::AutoShutdownTime(time) => write!(formatting, "{} minute(s)", time),
-            Self::SidetoneStatus(status) => write!(formatting, "{}", if *status { "active" } else { "inactive" }),
-            Self::SidetoneVolume(volume) => write!(formatting, "{}", volume),
-            Self::NoiseGateStatus(status) => write!(formatting, "{}", if *status { "on" } else { "off" }),
-            Self::MicrophoneStatus(status) => write!(formatting, "{}", if *status { "on" } else { "off" })
+fn get_info_and_sync(
+    device: Arc<Mutex<GuiDeviceInfo>>,
+    sender: Sender<ThreadMessage>,
+    receiver: Receiver<ThreadMessage>,
+    cached_state: &mut GuiDeviceInfo,
+    state: &mut State) -> Result<(), ()>    
+{
+    sender.send(ThreadMessage::GuiDeviceStruct(device.clone())).unwrap();
+    sender.clone().send(ThreadMessage::Ready).unwrap();
+    trace!("sent ready state to worker thread");
+
+    loop {
+        match receiver.recv() {
+            Ok(resp) => match resp {
+                ThreadMessage::Ready => {
+                    trace!("worker thread and ui thread are in sync!");
+                    state.is_synced = true;
+                    break
+                },
+                _ => ()
+            },
+
+            Err(_) => ()
         }
     }
+
+    trace!("broke from loop! cached information: {:?}", device);
+    if let Ok(snapshot) = device.try_lock() {
+            *cached_state = snapshot.clone();
+    }
+
+    Ok(())
 }
 
 pub struct ThreadChannel {
@@ -51,28 +63,29 @@ impl Default for ThreadChannel {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct GuiDeviceInfo {
-    pub battery_level: GuiResponse,
-    pub charging_status: GuiResponse,
-    pub headset_status: GuiResponse,
-    pub sidetone_status: GuiResponse,
-    pub sidetone_volume: GuiResponse,
-    pub noisegate_status: GuiResponse,
-    pub microphone_status: GuiResponse,
-    pub shutdown_time: GuiResponse
+    pub battery_level: Response,
+    pub charging_status: Response,
+    pub headset_status: Response,
+    pub sidetone_status: Response,
+    pub sidetone_volume: Response,
+    pub noisegate_status: Response,
+    pub microphone_status: Response,
+    pub shutdown_time: Response
 }
 
 impl Default for GuiDeviceInfo {
     fn default() -> Self {
         Self {
-            battery_level: GuiResponse::Unset,
-            charging_status: GuiResponse::Unset,
-            headset_status: GuiResponse::Unset,
-            sidetone_status: GuiResponse::Unset,
-            sidetone_volume: GuiResponse::Unset,
-            noisegate_status: GuiResponse::Unset,
-            microphone_status: GuiResponse::Unset,
-            shutdown_time: GuiResponse::Unset
+            battery_level: Response::Unset,
+            charging_status: Response::Unset,
+            headset_status: Response::Unset,
+            sidetone_status: Response::Unset,
+            sidetone_volume: Response::Unset,
+            noisegate_status: Response::Unset,
+            microphone_status: Response::Unset,
+            shutdown_time: Response::Unset
         }
     }
 }
@@ -89,10 +102,17 @@ impl Default for State {
     }
 }
 
+impl fmt::Display for State {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "{}", if self.is_synced { "synchronized" } else { "unsynchronized" })
+    }
+}
+
 pub struct Gui {
     channels: ThreadChannel,
-    device: GuiDeviceInfo,
-    state: State
+    device: Arc<Mutex<GuiDeviceInfo>>,
+    state: State,
+    cached: GuiDeviceInfo
 }
 
 pub fn main(gui_tx: Sender<ThreadMessage>, gui_rx: Receiver<ThreadMessage>) -> eframe::Result {
@@ -101,34 +121,47 @@ pub fn main(gui_tx: Sender<ThreadMessage>, gui_rx: Receiver<ThreadMessage>) -> e
         ..Default::default()
     };
 
-    eframe::run_native(
+    let eventloop = EventLoop::<UserEvent>::with_user_event().build()?;
+    eventloop.set_control_flow(ControlFlow::Poll);
+
+    let mut winit_app = eframe::create_native(
         "hsctl",
         options,
         Box::new(|cc| {
             Ok(Box::new(Gui::new(cc, gui_tx, gui_rx)))
         }),
-    )
+        &eventloop
+    );
+
+    eventloop.run_app(&mut winit_app)?;
+
+    Ok(())
 }
 
 impl Gui {
     #[instrument(level = "debug", skip_all)]
     fn new(cc: &eframe::CreationContext<'_>, gui_tx: Sender<ThreadMessage>, gui_rx: Receiver<ThreadMessage>) -> Self {
-        let mut context: eframe::egui::Context;
-        context = cc.egui_ctx.clone();
-        
-        gui_tx.clone().send(ThreadMessage::Context(context)).unwrap();
-        trace!("sent context handle to worker thread");
+        let mut device: Arc<Mutex<GuiDeviceInfo>> = Arc::new(Mutex::new(GuiDeviceInfo::default()));
+        let mut state: State = State::default();
+        let mut cached_state: GuiDeviceInfo = GuiDeviceInfo::default();
 
-        gui_tx.clone().send(ThreadMessage::Ready).unwrap();
-        trace!("sent ready state to worker thread");
+        let context: eframe::egui::Context = cc.egui_ctx.clone();
+        if let Ok(_) = send_context(context, gui_tx.clone()) {
+            trace!("sent context handle to worker thread")
+        }
 
-        Self {
+        if let Ok(_) = get_info_and_sync(device.clone(), gui_tx.clone(), gui_rx.clone(), &mut cached_state, &mut state) {
+            trace!("got device information and synchronized ui and worker threads")
+        }
+
+        Self {        
             channels: ThreadChannel {
                 sender: Some(gui_tx),
                 receiver: Some(gui_rx)
             },
-            device: GuiDeviceInfo::default(),
-            state: State::default()
+            device: device,
+            state: state,
+            cached: cached_state
         }
     }
 }
@@ -136,57 +169,31 @@ impl Gui {
 impl eframe::App for Gui {
     #[instrument(level = "debug", skip_all)]
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        if let Ok(snapshot) = self.device.try_lock() {
+            self.cached = snapshot.clone();
+        }
+        
+        let devstate = format!("current device state: {}", self.state);
+
         egui::CentralPanel::default().show(ui, |ui| {
-            if !self.state.is_synced {
-                ui.heading(new_rich_text("device is not synchronized.", 24.0));
+            ui.label(new_rich_text(&devstate, 24.0));
+
+            if self.cached == GuiDeviceInfo::default() {
+                ui.label(new_rich_text("device information not in sync yet", 24.0));
             } else {
-                ui.heading(new_rich_text("device is synchronized!", 24.0));
-            }
-
-            ui.separator();
-
-            ui.vertical(|ui| {
-                ui.label(new_rich_text("device information:", 20.0));
-                
-                // device information
-                ui.label(format!("battery level: {}", self.device.battery_level));
-                ui.label(format!("charging status: {}", self.device.charging_status));
-                ui.label(format!("headset status: {}", self.device.headset_status));
-                ui.label(format!("auto-shutdown time: {}", self.device.shutdown_time));
-                ui.label(format!("sidetone status: {}", self.device.sidetone_status));
-                ui.label(format!("sidetone volume: {}", self.device.sidetone_volume));
-                ui.label(format!("noisegate status: {}", self.device.noisegate_status));
-                ui.label(format!("microphone status: {}", self.device.microphone_status));
-            });
+                ui.vertical(|ui| {
+                    ui.label(new_rich_text("device information:", 24.0));
+                    ui.label(format!("{}", self.cached.battery_level));
+                    ui.label(format!("{}", self.cached.charging_status));
+                    ui.label(format!("{}", self.cached.headset_status));
+                    ui.label(format!("{}", self.cached.shutdown_time));
+                    ui.label(format!("{}", self.cached.sidetone_status));
+                    ui.label(format!("{}", self.cached.sidetone_volume));
+                    ui.label(format!("{}", self.cached.noisegate_status));
+                    ui.label(format!("{}", self.cached.microphone_status));
+                });
+            }           
         });
     }
 
-    #[instrument(level = "debug", skip_all)]
-    fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        match self.channels.receiver
-                .clone()
-                .expect("failed to get required sender/receiver pair for gui!")
-                .try_recv() {
-            Ok(msg) => match msg {
-                ThreadMessage::HeadsetResponse(resp) => match resp {
-                    Response::BatteryLevel(level) => self.device.battery_level = GuiResponse::BatteryLevel(level),
-                    Response::ChargingStatus(status) => self.device.charging_status = GuiResponse::ChargingStatus(status),
-                    Response::IsActive(status) => self.device.headset_status = GuiResponse::IsActive(status),
-                    Response::AutoShutdownTime(time) => self.device.shutdown_time = GuiResponse::AutoShutdownTime(time),
-                    Response::SidetoneStatus(status) => self.device.sidetone_status = GuiResponse::SidetoneStatus(status),
-                    Response::SidetoneVolume(volume) => self.device.sidetone_volume = GuiResponse::SidetoneVolume(volume),
-                    Response::NoiseGateStatus(status) => self.device.noisegate_status = GuiResponse::NoiseGateStatus(status),
-                    Response::MicrophoneStatus(status) => self.device.microphone_status = GuiResponse::MicrophoneStatus(status)
-                },
-                ThreadMessage::Request(_) => (),
-                ThreadMessage::Set { command: _, param: _ } => (),
-                ThreadMessage::Ready => {
-                    info!("successfully synchronized gui and worker thread!");
-                    self.state.is_synced = true;
-                },
-                _ => ()
-            }
-            Err(_) => ()
-        }
-    }
 }

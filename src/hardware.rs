@@ -1,13 +1,12 @@
 use std::fmt;
 use eframe::egui::Context;
-use tracing::{info, debug, warn, error, trace, instrument};
-use hidapi::{HidApi, HidDevice, HidError, DeviceInfo};
-use std::collections::HashMap;
-use clap::{Subcommand};
-use std::thread::sleep;
+use tracing::{info, debug, warn, trace, instrument};
+use std::thread::spawn;
 use std::time::Duration;
-use crossbeam_channel::{unbounded, Sender, Receiver};
-use crate::{ThreadMessage, sleep_ms, sleep_sec,ThreadMessage::HeadsetResponse};
+use hidapi::{HidApi, HidDevice};
+use clap::{Subcommand};
+use crossbeam_channel::{Sender, Receiver};
+use crate::{ThreadMessage, sleep_ms, sleep_sec, ui::GuiDeviceInfo, Arc, Mutex, sleep};
 
 pub const USAGE_PAGE: u16 = 0xFF90;
 pub const VENDOR_ID: u16 = 0x03F0;
@@ -35,18 +34,42 @@ macro_rules! execute {
 
 macro_rules! send_to_gui {
     ($self:ident, $field:ident, $sender:ident) => {
-        if let Some(resp) = $self.$field 
-        {
+        if let Some(resp) = $self.$field {
             match $sender.send(ThreadMessage::HeadsetResponse(resp)) {
-                Ok(_) => trace!("sending '{:?}' to gui thread", resp),
+                Ok(_) => trace!("sending {:?} to ui thread", resp),
                 Err(error) => {
-                    warn!("failed to send data to gui! {}", error);
+                    warn!("failed to send data to ui! {}", error);
                     return Err(HeadsetError::SendToGuiFail { attempted_data: resp })
                 }
             }
         }
     }
 }
+
+macro_rules! try_update_field {
+    ($self:ident, $field:ident, $struct:ident, $resp:ident) => {
+        trace!("trying to update ui struct with new response");
+        if let Ok(mut locked_struct) = $struct.lock() {
+            $self.$field = Some($resp);
+            locked_struct.$field = $resp;
+            
+        } else {
+            return Err(HeadsetError::GuiError)
+        }
+    };
+
+    ($self:ident, $field:ident, $struct:ident) => {
+        trace!("trying to update field for ui struct");
+        if let Ok(mut locked_struct) = $struct.lock() {
+            locked_struct.$field = $self.$field.unwrap();
+            
+        } else {
+            return Err(HeadsetError::GuiError)
+        }
+    }
+}
+
+
 
 #[repr(u8)]
 #[derive(Debug, Subcommand)]
@@ -189,13 +212,19 @@ pub enum HeadsetError {
     EmptyHandle,
     FlushError,
     ParseError { msg: String },
-    GetContextError
+    GetContextError,
+    GuiError
+}
+
+#[derive(Debug, PartialEq)]
+pub enum GuiError {
+    LockFail
 }
 
 impl fmt::Display for HeadsetError {
     fn fmt(&self, formatting: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::SendToGuiFail { attempted_data } => write!(formatting, "failed to send data to gui thread!"),
+            Self::SendToGuiFail { attempted_data } => write!(formatting, "failed to send data to ui thread!"),
             Self::Disconnected => write!(formatting, "device disconnected!"),
             Self::WriteError => write!(formatting, "failed to write to device!"),
             Self::ReadError { read } => write!(formatting, "failed to read data! expected: {}, got: {}", READ_SUCCESS, read),
@@ -203,7 +232,8 @@ impl fmt::Display for HeadsetError {
             Self::EmptyHandle => write!(formatting, "no matching usb device found!"),
             Self::FlushError => write!(formatting, "failed to flush queue!"),
             Self::ParseError { msg } => write!(formatting, "failed to parse buffer! msg: {}", msg),
-            Self::GetContextError => write!(formatting, "failed to get context handle from gui!")
+            Self::GetContextError => write!(formatting, "failed to get context handle from ui!"),
+            Self::GuiError => write!(formatting, "something happened when interacting with the ui!")
         }
     }
 }
@@ -223,6 +253,7 @@ pub struct HeadsetInfo {
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Response {
+    Unset,
     BatteryLevel(u8),
     ChargingStatus(bool),
     IsActive(bool),
@@ -237,6 +268,7 @@ pub enum Response {
 impl fmt::Display for Response {
     fn fmt(&self, formatting: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Self::Unset => write!(formatting, "n/a"),
             Self::IsActive(activity) => write!(formatting, "device status: {}", if *activity { "active" } else { "inactive" }),
             Self::BatteryLevel(level) => write!(formatting, "battery level: {}%", level),
             Self::ChargingStatus(status) => write!(formatting, "charging status: {}", if *status { "charging" } else { "not charging" }),
@@ -436,29 +468,30 @@ impl HeadsetInfo {
     }
 
     #[instrument(level = "debug", skip_all)]
-    pub fn send_info_to_gui(&mut self, sender: Sender<ThreadMessage>) -> Result<(), HeadsetError> {
-        // self.simulate_connect();
-        
-        send_to_gui!(self, battery_level, sender);
-        send_to_gui!(self, charging_status, sender);
-        send_to_gui!(self, headset_status, sender);
-        send_to_gui!(self, sidetone_status, sender);
-        send_to_gui!(self, sidetone_volume, sender);
-        send_to_gui!(self, noisegate_status, sender);
-        send_to_gui!(self, microphone_status, sender);
-        send_to_gui!(self, shutdown_time, sender);
+    pub fn send_initialized_data(&mut self, gui_info: Arc<Mutex<GuiDeviceInfo>>) -> Result<(), HeadsetError> {
+        try_update_field!(self, battery_level, gui_info);
+        try_update_field!(self, charging_status, gui_info);
+        try_update_field!(self, headset_status, gui_info);
+        try_update_field!(self, sidetone_status, gui_info);
+        try_update_field!(self, sidetone_volume, gui_info);
+        try_update_field!(self, noisegate_status, gui_info);
+        try_update_field!(self, microphone_status, gui_info);
+        try_update_field!(self, shutdown_time, gui_info);
+
         Ok(())
     }
 
     #[instrument(level = "debug", skip_all)]
     pub fn get_context_handle(&mut self, hardware_rx: Receiver<ThreadMessage>) -> Result<Context, HeadsetError> {
+        trace!("attempting to get context handle");
+
         loop {
             match hardware_rx.recv() {
                 Ok(resp) => {
-                    trace!("waiting until gui context handle is received..");
+                    trace!("waiting until ui context handle is received..");
                     match resp {
                         ThreadMessage::Context(ctx) => {
-                            debug!("got gui context handle");
+                            debug!("got ui context handle");
                             return Ok(ctx)
                         },
                         _ => ()
@@ -471,58 +504,89 @@ impl HeadsetInfo {
     }
 
     #[instrument(level = "debug", skip_all)]
-    pub fn listen_for_updates(&mut self, hardware_tx: Sender<ThreadMessage>, hardware_rx: Receiver<ThreadMessage>) -> Result<(), HeadsetError> {
-        info!("successfully started background listening");
-        let mut buf = [0u8; 20];
-        let mut context: Context = self.get_context_handle(hardware_rx.clone())?;
+    pub fn cache_and_update(&mut self,
+                        gui_info: Arc<Mutex<GuiDeviceInfo>>,
+                        hardware_tx: Sender<ThreadMessage>,
+                        hardware_rx: Receiver<ThreadMessage>,
+                        ) -> Result<(), HeadsetError> 
+    {
+        trace!("attempting to send initial device information to ui thread");
 
         loop {
-            // test receiving data across threads
-            match hardware_rx.try_recv() {
-                Ok(resp) => {
-                    trace!("new message from gui thread: {:?}", resp);
-                    match resp {
-                        ThreadMessage::Ready => {
-                            match self.send_info_to_gui(hardware_tx.clone()) {
-                                Ok(()) => { 
-                                    debug!("successfully sent fields to gui thread");
-                                    hardware_tx.send(ThreadMessage::Ready).unwrap();
-                                },
-                                Err(error) => warn!("unexpected error occurred while sending data to gui thread! {}", error)
+            let gui_info_clone = gui_info.clone();
+
+            match hardware_rx.recv() {
+                Ok(resp) => match resp {
+                    ThreadMessage::Ready => {
+                        match self.send_initialized_data(gui_info_clone) {
+                            Ok(_) => {
+                                trace!("sent device information to ui thread");
+                                hardware_tx.send(ThreadMessage::Ready).unwrap();
+                                trace!("sent ready state to ui thread");
+                                return Ok(())
                             }
-                        },
-                        _ => ()
-                    }
+                            Err(error) => warn!("unexpected error occurred while sending data to ui thread! {}", error)
+                        }
+                    },
+                    _ => ()
+                },
+                
+                Err(_) => ()
+            }
+        }
+    }
+
+    #[instrument(level = "debug", skip_all)]
+    pub fn get_shared_instance(&mut self, hardware_rx: Receiver<ThreadMessage>) -> Arc<Mutex<GuiDeviceInfo>> {
+        let gui_info: Arc<Mutex<GuiDeviceInfo>>;
+
+        trace!("attempting to receive ui device info struct from ui thread");
+        loop {
+            match hardware_rx.recv() {
+                Ok(resp) => match resp {
+                    ThreadMessage::GuiDeviceStruct(info) => {
+                        trace!("received device info struct");
+                        gui_info = info;
+                        return gui_info
+                    },
+                    _ => ()
                 },
                 Err(_) => ()
             }
+        }
+    }
 
+    #[instrument(level = "debug", skip_all)]
+    pub fn listen_for_updates(&mut self, hardware_tx: Sender<ThreadMessage>, hardware_rx: Receiver<ThreadMessage>) -> Result<(), HeadsetError> {
+        let mut buf = [0u8; 20];
+
+        let context: Context = self.get_context_handle(hardware_rx.clone())?;
+        let gui_info: Arc<Mutex<GuiDeviceInfo>> = self.get_shared_instance(hardware_rx.clone());
+
+        self.cache_and_update(gui_info.clone(), hardware_tx.clone(), hardware_rx.clone())?;
+        context.request_repaint();
+
+        info!("starting background listener");
+        loop {
             match self.handle.read_timeout(&mut buf, 10) {
                 Ok(READ_EMPTY) => (),
                 Ok(_) => {
+                    trace!("started command parsing request");
                     if let Ok(resp) = Commands::parse(&buf) {
                         info!("{}", resp);
 
-                        // test sending data across threads
-                        match hardware_tx.send(ThreadMessage::HeadsetResponse(resp)) {
-                            Ok(_) => trace!("sent {:?} message to gui", resp),
-                            Err(error) => warn!("error occurred while sending data over threads! {}", error)
-                        }
-
                         match resp {
-                            Response::BatteryLevel(_) => self.battery_level = Some(resp),
-                            Response::ChargingStatus(_) => self.charging_status = Some(resp),
-                            Response::IsActive(_) => self.headset_status = Some(resp),
-                            Response::AutoShutdownTime(_) => self.shutdown_time = Some(resp),
-                            Response::SidetoneStatus(_) => self.sidetone_status = Some(resp),
-                            Response::SidetoneVolume(_) => self.sidetone_volume = Some(resp),
-                            Response::NoiseGateStatus(_) => self.noisegate_status = Some(resp),
-                            Response::MicrophoneStatus(_) => self.microphone_status = Some(resp),
-                        };
-
-                        if resp == Response::IsActive(false) {
-                            trace!("device disconnected!")
+                            Response::Unset => (),
+                            Response::BatteryLevel(_) => { try_update_field!(self, battery_level, gui_info, resp); },
+                            Response::ChargingStatus(_) => { try_update_field!(self, charging_status, gui_info, resp); },
+                            Response::IsActive(_) => { try_update_field!(self, headset_status, gui_info, resp); },
+                            Response::AutoShutdownTime(_) => { try_update_field!(self, shutdown_time, gui_info, resp); },
+                            Response::SidetoneStatus(_) => { try_update_field!(self, sidetone_status, gui_info, resp); },
+                            Response::SidetoneVolume(_) => { try_update_field!(self, sidetone_volume, gui_info, resp); },
+                            Response::NoiseGateStatus(_) => { try_update_field!(self, noisegate_status, gui_info, resp); },
+                            Response::MicrophoneStatus(_) => { try_update_field!(self, microphone_status, gui_info, resp); }
                         }
+                        
                     }
 
                     context.request_repaint();
@@ -532,11 +596,12 @@ impl HeadsetInfo {
                     return Err(HeadsetError::HidApiError { msg: error.to_string() })
                 }
             }
-
         }
     }
 
-    // Usable commands for command line arguments
+    /* Usable functions for command line arguments.
+    Currently unused; kept commented until command line argument parsing is implemented to the software.
+
     #[instrument(level = "debug", skip_all)]
     pub fn get_battery(&mut self) -> Result<(), HeadsetError> {
         debug!("querying device");
@@ -625,4 +690,5 @@ impl HeadsetInfo {
         Ok(())
     }
 
+    */
 }

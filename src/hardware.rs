@@ -380,8 +380,8 @@ impl HeadsetInfo {
 
 
     #[instrument(level = "debug", skip_all)]
-    pub fn execute_command(&self, command: Commands, param: Option<u8>) -> Result<(), HeadsetError> {
-        trace!(command = ?command, param = param, "called execute method");
+    pub fn execute_command(&self, command: Commands, value: Option<u8>) -> Result<(), HeadsetError> {
+        trace!(command = ?command, value = value, "called execute method");
 
         let mut buf = [0u8; 20];
         buf[0] = 0x06; // Report ID
@@ -389,7 +389,7 @@ impl HeadsetInfo {
         buf[2] = 0xBB; // Constant
         buf[COMMAND_POS] = command as u8;
 
-        if let Some(value) = param {
+        if let Some(value) = value {
             buf[DEFAULT_RESP_POS] = value;
         }
         

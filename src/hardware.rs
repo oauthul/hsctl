@@ -567,8 +567,9 @@ impl HeadsetInfo {
         context.request_repaint();
 
         info!("starting background listener");
+
         loop {
-            match self.handle.read_timeout(&mut buf, 10) {
+            match self.handle.read(&mut buf) {
                 Ok(READ_EMPTY) => (),
                 Ok(_) => {
                     trace!("started command parsing request");

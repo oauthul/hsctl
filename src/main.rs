@@ -10,6 +10,7 @@ use ui::GuiDeviceInfo;
 use std::thread::{sleep, spawn};
 use std::time::Duration;
 use std::sync::{Arc, Mutex};
+use clap::Parser;
 
 pub fn sleep_ms(ms: u64) {
     sleep(Duration::from_millis(ms))

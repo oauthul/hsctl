@@ -83,7 +83,7 @@ fn main() {
         let mut retry_count: u8 = 0;
         let mut retry_sec: u64;
 
-        'keep_alive: loop {
+        'attempt_init: loop {
             trace!("trying to initialize headset...");
 
             let mut device = match init_device() {
@@ -104,7 +104,7 @@ fn main() {
                     sleep_sec(retry_sec);
                     retry_count = retry_count.saturating_add(1);
 
-                    continue 'keep_alive;
+                    continue 'attempt_init;
                 }
             };
 

@@ -44,6 +44,11 @@ fn init_device() -> Result<HeadsetInfo, HeadsetError> {
 }
 
 #[instrument(level = "debug", skip_all)]
+fn parse_command_requests() -> HashMap<hardware::Commands, u8> {
+    HashMap::from([(hardware::Commands::SetAutoShutdownTime, 5)])
+}
+
+#[instrument(level = "debug", skip_all)]
 fn logger_setup() {
     let formatter = fmt::layer()
                     .with_thread_names(true)

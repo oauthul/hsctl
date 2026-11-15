@@ -72,7 +72,7 @@ macro_rules! try_update_field {
 
 
 #[repr(u8)]
-#[derive(Debug, Subcommand)]
+#[derive(Debug, Subcommand, PartialEq, Eq, Hash)]
 pub enum Commands {
     // To set the Noise Gate status use the SetSidetoneStatus command,
     // though it may not do anything as per localized testing and may only modify the Sidetone.
@@ -378,7 +378,7 @@ impl HeadsetInfo {
         Ok(())
     }
 
-    #[instrument(level = "debug", skip_all)]
+    // #[instrument(level = "debug", skip_all)]
     pub fn commands_to_execute(&self) -> Result<(), HeadsetError> {
         // placeholder
     }

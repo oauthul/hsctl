@@ -378,6 +378,11 @@ impl HeadsetInfo {
         Ok(())
     }
 
+    #[instrument(level = "debug", skip_all)]
+    pub fn commands_to_execute(&self) -> Result<(), HeadsetError> {
+        // placeholder
+    }
+
 
     #[instrument(level = "debug", skip_all)]
     pub fn execute_command(&self, command: Commands, value: Option<u8>) -> Result<(), HeadsetError> {

@@ -5,13 +5,13 @@ use crossbeam_channel::{unbounded};
 use eframe::egui::Context;
 use tracing::{info, debug, error, warn, trace, Level, subscriber, instrument};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*, registry::Registry};
-use hardware::{HeadsetInfo, HeadsetError};
+use hardware::{HeadsetInfo, HeadsetError, Commands};
 use ui::GuiDeviceInfo;
 use std::thread::{sleep, spawn};
 use std::time::Duration;
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
-use clap::Parser;
+use clap::{Args, Parser, Subcommand};
 
 pub fn sleep_ms(ms: u64) {
     sleep(Duration::from_millis(ms))
@@ -31,13 +31,26 @@ enum ThreadMessage {
     GuiDeviceStruct(Arc<Mutex<GuiDeviceInfo>>)
 }
 
-#[derive[Parser]]
-#[command(name = "MyApp")]
-#[command(version = "1.0")]
-#[command(about = "Does awesome things", long_about = None)]
+#[derive(Parser)]
+#[command(name = "hsctl")]
+#[command(version = "1.0.0")]
+#[command(about = "A cross-platform and performant headset monitoring and management application built in Rust.", long_about = None)]
 struct Cli {
-    
+    #[command[subcommand]]
+    set_command: SetArgs,
 }
+
+#[derive(Subcommand)]
+enum SetArgs {
+    Set(Value)
+}
+
+#[derive(Args)]
+struct Value {
+    command: String,
+    parameter: u8
+}
+
 
 #[instrument(level = "debug", skip_all)]
 fn init_device() -> Result<HeadsetInfo, HeadsetError> {
@@ -53,8 +66,24 @@ fn init_device() -> Result<HeadsetInfo, HeadsetError> {
 
 #[instrument(level = "debug", skip_all)]
 fn parse_command_requests() -> HashMap<hardware::Commands, u8> {
-    HashMap::from([(hardware::Commands::SetAutoShutdownTime, 5)])
-}
+    let cli = Cli::parse();
+    let mut requests = HashMap::new();
+
+    match &cli.set_command {
+        SetArgs::Set(command) => {
+            match command.command.as_str() {
+                "shutdown" => requests.insert(Commands::SetAutoShutdownTime, command.parameter),
+                "noisegate_status" => requests.insert(Commands::SetSidetoneStatus, command.parameter),
+                "sidetone_status" => requests.insert(Commands::SetSidetoneStatus, command.parameter),
+                "sidetone_volume" => requests.insert(Commands::SetSidetoneVolume, command.parameter),
+                _ => None
+            };
+        },
+    }
+    
+    debug!("commands to execute: {:?}", requests);
+    requests
+}   
 
 #[instrument(level = "debug", skip_all)]
 fn logger_setup() {
@@ -91,6 +120,8 @@ fn logger_setup() {
 #[instrument(level = "debug", skip_all)]
 fn main() {
     logger_setup();
+    parse_command_requests();
+
     let (hardware_tx, gui_rx) = unbounded::<ThreadMessage>();
     let (gui_tx, hardware_rx) = unbounded::<ThreadMessage>();
 

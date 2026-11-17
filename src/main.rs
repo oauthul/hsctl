@@ -31,6 +31,14 @@ enum ThreadMessage {
     GuiDeviceStruct(Arc<Mutex<GuiDeviceInfo>>)
 }
 
+#[derive[Parser]]
+#[command(name = "MyApp")]
+#[command(version = "1.0")]
+#[command(about = "Does awesome things", long_about = None)]
+struct Cli {
+    
+}
+
 #[instrument(level = "debug", skip_all)]
 fn init_device() -> Result<HeadsetInfo, HeadsetError> {
     let mut device = HeadsetInfo::new()?;

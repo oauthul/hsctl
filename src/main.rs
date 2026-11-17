@@ -51,6 +51,9 @@ struct Value {
     parameter: u8
 }
 
+impl ValueEnum for Cli {
+    
+}
 
 #[instrument(level = "debug", skip_all)]
 fn init_device() -> Result<HeadsetInfo, HeadsetError> {
@@ -80,7 +83,7 @@ fn parse_command_requests() -> HashMap<hardware::Commands, u8> {
             };
         },
     }
-    
+
     debug!("commands to execute: {:?}", requests);
     requests
 }   

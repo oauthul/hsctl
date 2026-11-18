@@ -18,7 +18,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: install deps
+    - name: Install deps
       run: sudo apt update && sudo apt-get -y install libudev-dev
-    - name: build binary
+    - name: Build binary
       run: cargo build --verbose

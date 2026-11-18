@@ -51,9 +51,9 @@ struct Value {
     parameter: u8
 }
 
-impl ValueEnum for Cli {
+// impl ValueEnum for Cli {
     
-}
+// }
 
 #[instrument(level = "debug", skip_all)]
 fn init_device() -> Result<HeadsetInfo, HeadsetError> {

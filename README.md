@@ -12,29 +12,31 @@ hsctl can:
 
 ..and [more](docs/COMMANDS.md).
 
-## Dependencies
-hsctl relies on the [hidapi](https://github.com/ruabmbua/hidapi-rs) crate.<br>
-The hidapi crate needs the libudev development headers to compile, which may not be preinstalled on Linux systems.<br>
+## Prerequisites
+### Linux
+hsctl relies on the [hidapi](https://github.com/ruabmbua/hidapi-rs) crate, which needs the libudev development headers to compile, and may not be preinstalled on Linux systems.<br>
 To ensure hsctl compiles, install the libudev header files:
 
-Debian / Ubuntu (Tested on Debian 13.6 Trixie ARM64):<br>
-`sudo apt install libudev-dev`
+Debian / Ubuntu (tested on Debian 13.6 Trixie ARM64): `sudo apt install libudev-dev`
 
-Fedora (Tested on Fedora 44 ARM64):<br>
-`sudo dnf install systemd-devel`
+Fedora (tested on Fedora 44 ARM64): `sudo dnf install systemd-devel`
 
-Arch Linux (Tested on Arch Linux x64):<br>
-`sudo pacman -S pkgconf`
+Arch Linux (tested on Arch Linux x64): `sudo pacman -S pkgconf`
+
+### Windows
+If you're using Windows, you'll need the Visual Studio build tools to install the Rust compiler.
+
+Rust has a [guide](https://rust-lang.github.io/rustup/installation/windows-msvc.html) for this.
+
+### macOS
+macOS users do not have any prerequisites.
 
 ## Build [WIP]
 There are no pre-made binaries available to use as hsctl is still in development.<br>
 To use hsctl, you can compile it using the instructions below.<br>
-
-Install the dependencies for your machine.
 
 If you haven't done so already, install the Rust compiler [here](https://rust-lang.org/tools/install/).
 
 Clone this repository either through GitHub or by running: `git clone https://github.com/oauthul/hsctl.git`
 
 Navigate to the hsctl repository in your favorite terminal and run: `cargo build --release`
-

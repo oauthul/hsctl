@@ -38,12 +38,18 @@ Rust has a [guide](https://rust-lang.github.io/rustup/installation/windows-msvc.
 ### macOS
 macOS users do not have any prerequisites.
 
-## Build [WIP]
+## Build
 There are no pre-made binaries available to use as hsctl is still in development.<br>
 To use hsctl, you can compile it using the instructions below.<br>
 
-If you haven't done so already, install the Rust compiler [here](https://rust-lang.org/tools/install/). At minimum, you need Rust 1.92.0.
+### Installing the Rust compiler
+If you haven't done so already, install the Rust compiler [here](https://rust-lang.org/tools/install/).<br>
+At minimum, you need Rust 1.92.0.
 
-Clone this repository either through GitHub or by running: `git clone https://github.com/oauthul/hsctl.git`
+### Cloning the repository
+Clone the repository:
+- Git: `git clone https://github.com/oauthul/hsctl.git`
+- GitHub: Download the repository [zip](https://github.com/oauthul/hsctl/archive/refs/heads/main.zip) file
 
-Navigate to the hsctl repository in your favorite terminal and run: `cargo build --release`
+### Building the binary
+Navigate to the hsctl repository and run: `cargo build --release`

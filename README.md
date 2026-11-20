@@ -32,9 +32,9 @@ To use hsctl, you can compile it using the instructions below.<br>
 
 If you haven't done so already, install the Rust compiler [here](https://rust-lang.org/tools/install/).
 
-Clone this repository either through GitHub or by running: `git clone https://github.com/oauthul/hsctl.git`
+Install the dependencies for your machine.
 
-Install the dependencies.
+Clone this repository either through GitHub or by running: `git clone https://github.com/oauthul/hsctl.git`
 
 Navigate to the hsctl repository in your favorite terminal and run: `cargo build --release`
 

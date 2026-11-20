@@ -30,9 +30,9 @@ Arch Linux (Tested on Arch Linux x64):<br>
 There are no pre-made binaries available to use as hsctl is still in development.<br>
 To use hsctl, you can compile it using the instructions below.<br>
 
-If you haven't done so already, install the Rust compiler [here](https://rust-lang.org/tools/install/).
-
 Install the dependencies for your machine.
+
+If you haven't done so already, install the Rust compiler [here](https://rust-lang.org/tools/install/).
 
 Clone this repository either through GitHub or by running: `git clone https://github.com/oauthul/hsctl.git`
 

@@ -21,11 +21,14 @@ hsctl relies on the [hidapi](https://github.com/ruabmbua/hidapi-rs) crate which 
 
 Ensure the libudev development headers are installed for your system:
 
-**Debian / Ubuntu** (tested on Debian 13.6 Trixie ARM64): `sudo apt install libudev-dev`
+**Debian / Ubuntu** (tested on Debian 13.6 Trixie ARM64)<br>
+```sudo apt install libudev-dev```
 
-**Fedora** (tested on Fedora 44 ARM64): `sudo dnf install systemd-devel`
+**Fedora** (tested on Fedora 44 ARM64)<br>
+`sudo dnf install systemd-devel`
 
-**Arch Linux** (tested on Arch Linux x64): `sudo pacman -S pkgconf`
+**Arch Linux** (tested on Arch Linux x64)<br>
+`sudo pacman -S pkgconf`
 
 ### Windows
 If you're using Windows, you'll need the Visual Studio build tools to install the Rust compiler.

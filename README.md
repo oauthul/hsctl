@@ -56,3 +56,15 @@ Clone the repository:
 Run `cargo build --release` in the hsctl directory.
 
 By default, the binary will be located at `<hsctl_root>/target/release/hsctl` on Linux and macOS systems, or `<hsctl_root>/target/release/hsctl.exe` on Windows systems.
+
+## Why?
+While there are other projects similar to mine that are much more advanced and developed, hsctl is a hobby project. I have very little experience with programming, so I used this project as a way to learn how to program better in general (especially in Rust) and how to make open source projects like a developer in the industry. I am not a software engineer, though I would love to be one.
+
+hsctl was only possible with the help of the hard work and dedication of other projects, most notably:
+- [HyperHeadset](https://github.com/LennardKittner/HyperHeadset) by LennardKittner (helped with understanding Rust in the context of device I/O and using already existing code)
+- [HyperX-Cloud-2-Battery-Monitor](https://github.com/auto94/HyperX-Cloud-2-Battery-Monitor) by auto94 (helped with understanding the protocol for the Stinger 2 Wireless)
+- [hidapi-rs](https://github.com/ruabmbua/hidapi-rs) by ruabmbua (the Rust wrapper for the C [hidapi](https://github.com/libusb/hidapi) library)
+- [egui](https://github.com/emilk/egui) by emilk (the GUI library used in hsctl)
+- [crossbeam](https://github.com/crossbeam-rs/crossbeam) by crossbeam-rs (tools for concurrent programming in Rust)
+- [tracing](https://github.com/tokio-rs/tracing) by tokio-rs (logging library for Rust)
+- [clap](https://github.com/clap-rs/clap) by clap-rs (command line argument parser for Rust)

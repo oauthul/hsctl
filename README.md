@@ -36,10 +36,10 @@ hsctl relies on the [hidapi](https://github.com/ruabmbua/hidapi-rs) crate which 
 
 Ensure the libudev development headers are installed for your system:
 
-**Debian / Ubuntu** (tested on Debian 13.6 Trixie ARM64)<br>
-```sudo apt install libudev-dev```
+**Debian / Ubuntu**<br>
+`sudo apt install libudev-dev`
 
-**Fedora** (tested on Fedora 44 ARM64)<br>
+**Fedora**<br>
 `sudo dnf install systemd-devel`
 
 **Arch Linux**<br>

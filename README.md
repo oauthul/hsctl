@@ -37,14 +37,32 @@ hsctl relies on the [hidapi](https://github.com/ruabmbua/hidapi-rs) crate which 
 Ensure the libudev development headers are installed for your system:
 
 **Debian / Ubuntu**<br>
-`sudo apt install libudev-dev`
+```
+sudo apt install libudev-dev
+```
 
 **Fedora**<br>
-`sudo dnf install systemd-devel`
+```
+sudo dnf install systemd-devel
+```
 
 **Arch Linux**<br>
-`sudo pacman -S pkgconf`
+```
+sudo pacman -S pkgconf
+```
 
+### Permissions
+
+On Linux machines, hsctl requires permissions so it can access and open the headset successfully.
+
+To do this, you can add a udev rule file in `/etc/udev/rules.d` or `/usr/lib/udev/rules.d`:
+
+```
+# /path/to/rules.d/99-<filename>.rules
+
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="0d93", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="0d93", TAG+="uaccess"
+```
 ### Windows
 If you're using Windows, you'll need the Visual Studio build tools to install the Rust compiler.
 

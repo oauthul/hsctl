@@ -48,7 +48,7 @@ macro_rules! send_to_gui {
 
 macro_rules! try_update_field {
     ($self:ident, $field:ident, $struct:ident, $resp:ident) => {
-        trace!("trying to update ui struct with new response");
+        trace!("updating ui field, previous state: {:?}, new state: {:?}", $self.$field, $resp);
         if let Ok(mut locked_struct) = $struct.lock() {
             $self.$field = Some($resp);
             locked_struct.$field = $resp;
@@ -59,7 +59,7 @@ macro_rules! try_update_field {
     };
 
     ($self:ident, $field:ident, $struct:ident) => {
-        trace!("trying to update field for ui struct");
+        trace!("updating ui field state: {:?}", $self.$field);
         if let Ok(mut locked_struct) = $struct.lock() {
             locked_struct.$field = $self.$field.unwrap();
             

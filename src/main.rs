@@ -80,6 +80,14 @@ fn logger_setup() {
 fn main() {
     logger_setup();
 
+    let matches = clap::Command::new("hsctl").arg(
+        Arg::new("auto-shutdown")
+        .long("auto-shutdown")
+        .required(false)
+    ).get_matches();
+
+    debug!("{:?}", matches);
+
     let (hardware_tx, gui_rx) = unbounded::<ThreadMessage>();
     let (gui_tx, hardware_rx) = unbounded::<ThreadMessage>();
 

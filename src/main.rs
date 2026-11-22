@@ -79,7 +79,6 @@ fn logger_setup() {
 #[instrument(level = "debug", skip_all)]
 fn main() {
     logger_setup();
-    parse_command_requests();
 
     let (hardware_tx, gui_rx) = unbounded::<ThreadMessage>();
     let (gui_tx, hardware_rx) = unbounded::<ThreadMessage>();

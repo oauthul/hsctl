@@ -45,27 +45,6 @@ fn init_device() -> Result<HeadsetInfo, HeadsetError> {
 }
 
 #[instrument(level = "debug", skip_all)]
-fn parse_command_requests() -> HashMap<hardware::Commands, u8> {
-    let cli = Cli::parse();
-    let mut requests = HashMap::new();
-
-    match &cli.set_command {
-        SetArgs::Set(command) => {
-            match command.command.as_str() {
-                "shutdown" => requests.insert(Commands::SetAutoShutdownTime, command.parameter),
-                "noisegate_status" => requests.insert(Commands::SetSidetoneStatus, command.parameter),
-                "sidetone_status" => requests.insert(Commands::SetSidetoneStatus, command.parameter),
-                "sidetone_volume" => requests.insert(Commands::SetSidetoneVolume, command.parameter),
-                _ => None
-            };
-        },
-    }
-
-    debug!("commands to execute: {:?}", requests);
-    requests
-}   
-
-#[instrument(level = "debug", skip_all)]
 fn logger_setup() {
     let formatter = fmt::layer()
                     .with_thread_names(true)

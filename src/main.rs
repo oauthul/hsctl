@@ -11,7 +11,7 @@ use std::thread::{sleep, spawn};
 use std::time::Duration;
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
-use clap::{Args, Parser, Subcommand};
+use clap::{command, Arg};
 
 pub fn sleep_ms(ms: u64) {
     sleep(Duration::from_millis(ms))
@@ -31,29 +31,6 @@ enum ThreadMessage {
     GuiDeviceStruct(Arc<Mutex<GuiDeviceInfo>>)
 }
 
-#[derive(Parser)]
-#[command(name = "hsctl")]
-#[command(version = "1.0.0")]
-#[command(about = "A cross-platform and performant headset monitoring and management application built in Rust.", long_about = None)]
-struct Cli {
-    #[command[subcommand]]
-    set_command: SetArgs,
-}
-
-#[derive(Subcommand)]
-enum SetArgs {
-    Set(Value)
-}
-
-#[derive(Args)]
-struct Value {
-    command: String,
-    parameter: u8
-}
-
-// impl ValueEnum for Cli {
-    
-// }
 
 #[instrument(level = "debug", skip_all)]
 fn init_device() -> Result<HeadsetInfo, HeadsetError> {

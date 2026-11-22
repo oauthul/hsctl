@@ -1,14 +1,29 @@
 # hsctl [headset control]
 A lightweight, cross-platform and performant headset monitoring and management application built in Rust.
 
-## Supported Devices
+## OS Compatibility
+hsctl is aimed to be cross-platform (Linux, Windows and macOS).
+
+|        OS       | x86 | x64 | ARM | ARM64 |           Tested Version           |
+|:---------------:|:---:|:---:|:---:|:-----:|:----------------------------------:|
+| Debian / Ubuntu |  ?  |  ?  |  ?  |   ✓   |     Debian 13.6 (trixie) ARM64     |
+|      Fedora     |  ?  |  ?  |  ?  |   ✓   |           Fedora 44 ARM64          |
+|    Arch Linux   |  ?  |  ✓  |  ?  |   ?   |           Arch Linux x64           |
+|     Windows     |  ?  |  ✓  |  ?  |   ✓   | Windows 11 26H2 (26300.9974) ARM64 |
+|      macOS      |  ?  |  ?  |  ?  |   ✓   |      macOS Tahoe 26.6.2 ARM64      |
+
+A tick (✓) shows that hsctl was tested to successfully compile and run on that OS and it's targeted CPU architecture, while a question mark (?) shows that hsctl was not tested for that specific OS and CPU architecture combination, but may still work regardless.
+
+hsctl should run on both ARM/ARM64 and x86-64 devices.
+
+## Supported Headsets
 As of now, hsctl supports the HyperX Cloud Stinger 2 Wireless.<br>
 
 hsctl can:
-- Get the battery level of the headset,
-- Get the charging status of the headset,
-- Get the microphone status of the headset,
-- Get and set the auto-shutdown time of the headset
+- Get the battery level of the Stinger 2 Wireless,
+- Get the charging status of the Stinger 2 Wireless,
+- Get the microphone status of the Stinger 2 Wireless,
+- Get and set the auto-shutdown time of the Stinger 2 Wireless
 
 ..and [more](docs/COMMANDS.md).
 
@@ -27,7 +42,7 @@ Ensure the libudev development headers are installed for your system:
 **Fedora** (tested on Fedora 44 ARM64)<br>
 `sudo dnf install systemd-devel`
 
-**Arch Linux** (tested on Arch Linux x64)<br>
+**Arch Linux**<br>
 `sudo pacman -S pkgconf`
 
 ### Windows

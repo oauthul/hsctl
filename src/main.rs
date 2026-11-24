@@ -80,7 +80,10 @@ fn logger_setup() {
 fn main() {
     logger_setup();
 
-    let mut commands = clap::Command::new("hsctl").args([
+    let mut commands = clap::Command::new("hsctl")
+    .about("A lightweight, cross-platform and performant headset monitoring and management application built in Rust.")
+    .version("1.0.0")
+    .args([
         Arg::new("time in minutes, e.g. 5")
         .long("auto-shutdown")
         .required(false),

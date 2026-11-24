@@ -80,13 +80,20 @@ fn logger_setup() {
 fn main() {
     logger_setup();
 
-    let matches = clap::Command::new("hsctl").arg(
-        Arg::new("auto-shutdown")
+    let mut commands = clap::Command::new("hsctl").args([
+        Arg::new("time in minutes, e.g. 5")
         .long("auto-shutdown")
+        .required(false),
+        Arg::new("noisegate status, e.g. true or false")
+        .long("noisegate-status")
+        .required(false),
+        Arg::new("sidetone volume, e.g. 45")
+        .long("sidetone-volume")
         .required(false)
-    ).get_matches();
+    ]);
+    let arguments = commands.get_matches();
 
-    debug!("{:?}", matches);
+    debug!("{:?}", arguments);
 
     let (hardware_tx, gui_rx) = unbounded::<ThreadMessage>();
     let (gui_tx, hardware_rx) = unbounded::<ThreadMessage>();
